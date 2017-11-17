@@ -1,7 +1,9 @@
 ﻿#if UNITY_EDITOR
-using System.Collections;
-using TMPro;
 using System;
+using System.Collections;
+#if INCLUDE_TEXT_MESH_PRO
+using TMPro;
+#endif
 using UnityEditor.Experimental.EditorVR.Utilities;
 using UnityEngine;
 using UnityEngine.UI;
@@ -333,6 +335,7 @@ namespace UnityEditor.Experimental.EditorVR.Modules
         }
 
         const float k_IconTextMinSpacing = 4;
+        const float k_IconTextSpacing = 14;
 
         enum TransitionState
         {
@@ -352,21 +355,18 @@ namespace UnityEditor.Experimental.EditorVR.Modules
 
         [SerializeField]
         Image m_Icon;
-
+#if INCLUDE_TEXT_MESH_PRO
         [SerializeField]
         TMP_Text m_TextLeft;
 
         [SerializeField]
         TMP_Text m_TextRight;
-
+#endif
         [SerializeField]
         CanvasGroup m_LeftTextCanvasGroup;
 
         [SerializeField]
         CanvasGroup m_RightTextCanvasGroup;
-
-        [SerializeField]
-        float m_IconTextSpacing = 14;
 
         [SerializeField]
         LayoutElement m_LeftSpacer;
@@ -380,9 +380,10 @@ namespace UnityEditor.Experimental.EditorVR.Modules
         [SerializeField]
         SkinnedMeshRenderer m_BackgroundOutlineRenderer;
 
-        [SerializeField] private string m_DEMOTEXT;
-        [SerializeField] private TextAlignment m_DEMOTEXTALIGNMENT;
-        [SerializeField] private Sprite m_DEMOSPRITE;
+        // REMOVE DEMO FIELDS
+        [Header("TESTING PARAMS")]
+        [SerializeField]
+        Sprite m_DEMOSPRITE;
 
         //TransitionState m_TransitionState = TransitionState.Hidden;
         bool m_Visible;
@@ -407,6 +408,7 @@ namespace UnityEditor.Experimental.EditorVR.Modules
         public RawImage dottedLine { get { return m_DottedLine; } }
         public Transform[] spheres { get { return m_Spheres; } }
         public Image background { get { return m_Background; } }
+        public RectTransform rectTransform { get { return m_Background.rectTransform; } }
 
         public bool transitioning
         {
@@ -417,11 +419,7 @@ namespace UnityEditor.Experimental.EditorVR.Modules
         }
 
         public event Action becameVisible;
-
-        public RectTransform rectTransform
-        {
-            get { return m_Background.rectTransform; }
-        }
+        public Action<IWillRender> removeSelf { get; set; }
 
         void Awake()
         {
@@ -449,46 +447,45 @@ namespace UnityEditor.Experimental.EditorVR.Modules
 
         public void ShowX(string text, TextAlignment alignment, Sprite iconSprite = null)
         {
-            text = Random.Range(0, 10) > 4f ? text : null;
-            var validText = !string.IsNullOrEmpty(text);
-
-            //m_TMPText.text = text;
-            //this.RestartCoroutine(ref m_AnimateShowTextCoroutine, AnimateShowText());
-
-            iconSprite = Random.Range(0, 10) > 4f ? m_DEMOSPRITE : (validText ? null : m_DEMOSPRITE); // TODO REMOVE
-
             // if Icon null, fade out opacity of current icon
             // if icon is not null, fade out current, fade in new icon
+            var validText = !string.IsNullOrEmpty(text);
+            var iconVisible = iconSprite != null;
             m_Icon.sprite = iconSprite;
-            var iconVisible = m_Icon.sprite != null;
-            m_Icon.enabled = iconVisible; // TODO convert to scale up/down then fade in/out
+            m_Icon.enabled = iconVisible;
             switch (alignment)
             {
                 case TextAlignment.Center:
                 case TextAlignment.Left:
                     // Treat center as left justified, aside from horizontal offset placement
+#if INCLUDE_TEXT_MESH_PRO
                     m_TextRight.text = text;
                     m_TextRight.gameObject.SetActive(validText);
                     m_TextLeft.gameObject.SetActive(false);
                     //m_RightSpacer.minWidth = validText ? iconVisible ? m_IconTextSpacing : 0 : 0;
                     //m_LeftSpacer.minWidth = validText ? iconVisible ? k_IconTextMinSpacing : 8 : 0; ;
+#endif
                     break;
                 case TextAlignment.Right:
+#if INCLUDE_TEXT_MESH_PRO
                     m_TextLeft.text = text;
                     m_TextRight.gameObject.SetActive(false);
                     m_TextLeft.gameObject.SetActive(validText);
                     //m_RightSpacer.minWidth = validText ? iconVisible ? k_IconTextMinSpacing : 8 : 0;
                     //m_LeftSpacer.minWidth = validText ? iconVisible ? m_IconTextSpacing : 0 : 0;
+#endif
                     break;
             }
 
             if (!validText && iconVisible)
             {
+                // Set rounded corners
                 m_BackgroundRenderer.SetBlendShapeWeight(0, 0);
                 m_BackgroundOutlineRenderer.SetBlendShapeWeight(0, 0);
             }
             else
             {
+                // Set sharper/square corners
                 m_BackgroundRenderer.SetBlendShapeWeight(0, 90);
                 m_BackgroundOutlineRenderer.SetBlendShapeWeight(0, 90);
             }
@@ -527,10 +524,10 @@ namespace UnityEditor.Experimental.EditorVR.Modules
                     case TextAlignment.Center:
                     case TextAlignment.Left:
                         m_RightTextAnimationContainer.AssignNewContent(forceHideIfNoIconOrText ? 0 : validIcon ? k_IconTextMinSpacing : 10);
-                        m_LeftTextAnimationContainer.AssignNewContent(validText && !validIcon ? 0 : !validIcon ? k_IconTextMinSpacing : m_IconTextSpacing, text);
+                        m_LeftTextAnimationContainer.AssignNewContent(validText && !validIcon ? 0 : !validIcon ? k_IconTextMinSpacing : k_IconTextSpacing, text);
                         break;
                     case TextAlignment.Right:
-                        m_RightTextAnimationContainer.AssignNewContent(validText && !validIcon ? 0 : !validIcon ? k_IconTextMinSpacing : m_IconTextSpacing, text);
+                        m_RightTextAnimationContainer.AssignNewContent(validText && !validIcon ? 0 : !validIcon ? k_IconTextMinSpacing : k_IconTextSpacing, text);
                         m_LeftTextAnimationContainer.AssignNewContent(forceHideIfNoIconOrText ? 0 : validIcon ? k_IconTextMinSpacing : 10);
                         break;
                 }

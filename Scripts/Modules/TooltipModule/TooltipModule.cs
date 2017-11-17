@@ -17,9 +17,6 @@ namespace UnityEditor.Experimental.EditorVR.Modules
 
         const int k_PoolInitialCapacity = 16;
 
-        const string k_MaterialColorTopProperty = "_ColorTop";
-        const string k_MaterialColorBottomProperty = "_ColorBottom";
-
         static readonly Quaternion k_FlipYRotation = Quaternion.AngleAxis(180f, Vector3.up);
         static readonly Quaternion k_FlipZRotation = Quaternion.AngleAxis(180f, Vector3.forward);
 
@@ -29,18 +26,11 @@ namespace UnityEditor.Experimental.EditorVR.Modules
         [SerializeField]
         GameObject m_TooltipCanvasPrefab;
 
-        [SerializeField]
-        Material m_HighlightMaterial;
-
-        [SerializeField]
-        Material m_TooltipBackgroundMaterial;
-
         class TooltipData
         {
             public float startTime;
             public float lastModifiedTime;
             public TooltipUI tooltipUI;
-            public Material customHighlightMaterial;
             public bool persistent;
             public float duration;
             public Action becameVisible;
@@ -63,7 +53,6 @@ namespace UnityEditor.Experimental.EditorVR.Modules
 
         Transform m_TooltipCanvas;
         Vector3 m_TooltipScale;
-        Color m_OriginalBackgroundColor;
 
         // Local method use only -- created here to reduce garbage collection
         static readonly List<ITooltip> k_TooltipsToRemove = new List<ITooltip>();
@@ -75,12 +64,6 @@ namespace UnityEditor.Experimental.EditorVR.Modules
             m_TooltipCanvas = Instantiate(m_TooltipCanvasPrefab).transform;
             m_TooltipCanvas.SetParent(transform);
             m_TooltipScale = m_TooltipPrefab.transform.localScale;
-            m_HighlightMaterial = Instantiate(m_HighlightMaterial);
-            m_TooltipBackgroundMaterial = Instantiate(m_TooltipBackgroundMaterial);
-            m_OriginalBackgroundColor = m_TooltipBackgroundMaterial.color;
-            var sessionGradient = UnityBrandColorScheme.sessionGradient;
-            m_HighlightMaterial.SetColor(k_MaterialColorTopProperty, sessionGradient.a);
-            m_HighlightMaterial.SetColor(k_MaterialColorBottomProperty, sessionGradient.b);
         }
 
         void Update()
@@ -110,7 +93,6 @@ namespace UnityEditor.Experimental.EditorVR.Modules
 
                         tooltipUI.becameVisible += tooltipData.becameVisible;
                         tooltipData.tooltipUI = tooltipUI;
-                        tooltipUI.background.material = m_TooltipBackgroundMaterial;
                         var tooltipTransform = tooltipUI.transform;
                         MathUtilsExt.SetTransformOffset(target, tooltipTransform, Vector3.zero, Quaternion.identity);
                         tooltipTransform.localScale = Vector3.zero;
@@ -187,8 +169,6 @@ namespace UnityEditor.Experimental.EditorVR.Modules
 
             var viewerScale = this.GetViewerScale();
             tooltipTransform.localScale = m_TooltipScale * lerp * viewerScale;
-
-            m_TooltipBackgroundMaterial.SetColor("_Color", Color.Lerp(UnityBrandColorScheme.darker, m_OriginalBackgroundColor, lerp));
 
             // Adjust for alignment
             var offset = Vector3.zero;
@@ -326,7 +306,6 @@ namespace UnityEditor.Experimental.EditorVR.Modules
                 //Debug.LogWarning("ExistingTooltipFound : " + tooltip.tooltipText);
                 activeTooltipData.persistent |= persistent;
                 activeTooltipData.placement = placement ?? tooltip as ITooltipPlacement;
-                activeTooltipData.customHighlightMaterial = GetHighlightMaterial(tooltip); // TODO remove highlight materials for new tooltip
                 activeTooltipData.active = false;
 
                 if (duration > 0)
@@ -360,7 +339,6 @@ namespace UnityEditor.Experimental.EditorVR.Modules
 
             var newTooltipData = new TooltipData
             {
-                customHighlightMaterial = GetHighlightMaterial(tooltip),
                 startTime = Time.time,
                 lastModifiedTime = Time.time,
                 persistent = persistent,
@@ -372,21 +350,6 @@ namespace UnityEditor.Experimental.EditorVR.Modules
 
             if (persistent)
                 m_PersistentTooltips[tooltip] = newTooltipData;
-        }
-
-        Material GetHighlightMaterial(ITooltip tooltip)
-        {
-            Material highlightMaterial = null;
-            var customTooltipColor = tooltip as ISetCustomTooltipColor;
-            if (customTooltipColor != null)
-            {
-                highlightMaterial = Instantiate(m_HighlightMaterial);
-                var customTooltipHighlightColor = customTooltipColor.customTooltipHighlightColor;
-                highlightMaterial.SetColor(k_MaterialColorTopProperty, customTooltipHighlightColor.a);
-                highlightMaterial.SetColor(k_MaterialColorBottomProperty, customTooltipHighlightColor.b);
-            }
-
-            return highlightMaterial;
         }
 
         static bool IsValidTooltip(ITooltip tooltip)
@@ -454,6 +417,9 @@ namespace UnityEditor.Experimental.EditorVR.Modules
         {
             var tooltipUI = tooltipData.tooltipUI;
             tooltipUI.becameVisible -= tooltipData.becameVisible;
+            if (tooltipUI.removeSelf != null)
+                tooltipUI.removeSelf(tooltipUI);
+
             m_TooltipPool.Enqueue(tooltipUI);
         }
     }
